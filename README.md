@@ -128,7 +128,7 @@ python validate.py
 
 * **wasae** 
 * **raja** 
-* * **john** 
-* * **hari** 
+* **john** 
+* **hari** 
 
 
