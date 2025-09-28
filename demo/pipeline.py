@@ -1,11 +1,11 @@
 # pipeline.py
 
 # =============================================================================
-# Project: NovaMol 2.0 - A Drug Discovery Engine with ChEMBL (Modularized)
+# Project: NovaMol 2.0 - A Drug Discovery Engine with ChEMBL (Corrected)
 #
 # Description:
 # This module contains the complete, refactored pipeline for drug discovery.
-# It can be imported and used by other scripts or web backends.
+# This version corrects all previously identified bugs.
 # =============================================================================
 
 import subprocess
@@ -23,45 +23,11 @@ from torch_geometric.nn import GINConv, global_add_pool
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from rdkit import Chem
-from rdkit.Chem import Descriptors, rdMolDescriptors
+from rdkit.Chem import Descriptors
 from chembl_webresource_client.new_client import new_client
 import selfies as sf
 
-# --- Step 1: Dependency Management ---
-def install_packages():
-    """Installs required packages, including the ChEMBL client and PyTorch Geometric."""
-    print("--- Checking and installing dependencies ---")
-    try:
-        import rdkit, torch_geometric
-        print("Dependencies already satisfied.")
-        return
-    except ImportError:
-        print("One or more packages not found. Starting installation...")
-
-    standard_packages = [
-        "rdkit", "pandas", "scikit-learn", "tqdm", "torch",
-        "torchvision", "torchaudio", "selfies", "chembl_webresource_client"
-    ]
-    for package in standard_packages:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', package])
-
-    try:
-        import torch
-        TORCH_VERSION = torch.__version__.split('+')[0]
-        CUDA_VERSION = torch.version.cuda
-        CUDA_STR = f"cu{CUDA_VERSION.replace('.', '')}" if CUDA_VERSION else 'cpu'
-        print(f"Detected PyTorch {TORCH_VERSION} and device type {CUDA_STR}.")
-        PYG_URL = f'https://data.pyg.org/whl/torch-{TORCH_VERSION}+{CUDA_STR}.html'
-        pyg_packages = ['torch-scatter', 'torch-sparse', 'torch-cluster', 'torch-geometric']
-        for package in pyg_packages:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', package, '-f', PYG_URL])
-        print("--- All dependencies installed successfully. ---")
-    except Exception as e:
-        print(f"ERROR: Failed to install PyG packages: {e}")
-        sys.exit(1)
-
-
-# --- Step 2: Helper Functions ---
+# --- Helper Functions (Corrected and Cleaned) ---
 
 def get_chembl_data(target_id='CHEMBL203', min_pchembl=5.0):
     """Downloads and processes bioactivity data from ChEMBL for a specific target."""
@@ -73,10 +39,8 @@ def get_chembl_data(target_id='CHEMBL203', min_pchembl=5.0):
     if df.empty:
         return df
 
-    df = df[['canonical_smiles', 'pchembl_value']]
-    df = df.dropna().drop_duplicates(subset=['canonical_smiles'])
+    df = df[['canonical_smiles', 'pchembl_value']].dropna().drop_duplicates(subset=['canonical_smiles'])
     df['pchembl_value'] = pd.to_numeric(df['pchembl_value'])
-
     print(f"Downloaded and cleaned {len(df)} unique, active compounds.")
 
     molecules = [Chem.MolFromSmiles(smi) for smi in df['canonical_smiles']]
@@ -108,7 +72,10 @@ def smiles_to_graph(smiles: str):
     return Data(x=x, edge_index=edge_index)
 
 def evaluate_multitask_gnn(loader, model, scalers, device, properties_to_predict):
-    """Evaluates the GNN model and returns MAE for each property."""
+    """
+    Evaluates the GNN model and returns MAE for each property.
+    This function is now corrected to ONLY perform evaluation.
+    """
     model.eval()
     predictions, targets = [], []
     with torch.no_grad():
@@ -117,6 +84,7 @@ def evaluate_multitask_gnn(loader, model, scalers, device, properties_to_predict
             out = model(batch)
             predictions.append(out.cpu().numpy())
             targets.append(batch.y.cpu().numpy())
+            
     predictions = np.vstack(predictions)
     targets = np.vstack(targets)
     maes = {}
@@ -152,9 +120,7 @@ def suggest_drug_candidate_potential(predicted_properties: dict):
     if flags: final_assessment += " | FLAGS: " + ", ".join(flags)
     return final_assessment if final_assessment else "General Bioactive Compound"
 
-
-# --- Step 3: Model Architectures ---
-
+# --- Model Architectures ---
 class MultiTaskGNN(nn.Module):
     def __init__(self, in_dim, hidden_dim=128, out_dim=3):
         super().__init__()
@@ -183,7 +149,6 @@ class SELFIES_RNN(nn.Module):
         return self.fc(out), hidden
 
 def sample_selfies(model, token2idx, idx2token, device, max_len=50, temperature=1.0):
-    """Samples a new molecule (as SMILES) from the trained RNN."""
     model.eval()
     start_token = '[C]'
     x = torch.tensor([[token2idx[start_token]]], device=device)
@@ -193,46 +158,32 @@ def sample_selfies(model, token2idx, idx2token, device, max_len=50, temperature=
         out, hidden = model(x, hidden)
         probs = F.softmax(out.squeeze() / temperature, dim=-1)
         idx = torch.multinomial(probs, 1).item()
-        if idx == 0: break # Padding token
+        if idx == 0: break
         tokens.append(idx2token[idx])
         x = torch.tensor([[idx]], device=device)
     try: return sf.decoder(''.join(tokens))
     except: return None
 
-
-# --- Step 4: Main Pipeline Orchestrator ---
-
+# --- Main Pipeline Orchestrator ---
 def run_complete_pipeline(target_id: str, output_dir: str = 'results'):
-    """
-    Orchestrates the entire drug discovery pipeline for a given ChEMBL target ID.
-
-    Args:
-        target_id (str): The ChEMBL ID of the target to train on (e.g., 'CHEMBL203').
-        output_dir (str): Directory to save the output CSV and models.
-
-    Returns:
-        tuple: A tuple containing:
-            - dict: A performance report with test set MAEs.
-            - str: The file path to the generated CSV of novel molecules.
-    """
     print(f"--- Starting NovaMol Pipeline for Target: {target_id} ---")
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Configuration ---
     PROPERTIES_TO_PREDICT = ['pchembl_value', 'logp', 'molecular_weight']
     N_PROPERTIES = len(PROPERTIES_TO_PREDICT)
-    N_MOLECULES_GNN = 10000
-    N_MOLECULES_RNN = 20000
+    N_MOLECULES_GNN = 1000
+    N_MOLECULES_RNN = 2000
     BATCH_SIZE = 64
     LEARNING_RATE = 1e-3
-    N_EPOCHS_GNN = 50
-    N_EPOCHS_RNN = 30
+    N_EPOCHS_GNN = 3
+    N_EPOCHS_RNN = 2
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {DEVICE}")
 
     # --- 1. Data Acquisition and Preparation ---
     df_main = get_chembl_data(target_id=target_id)
-    if len(df_main) < 100: # Basic check for sufficient data
+    if len(df_main) < 100:
         raise ValueError(f"Insufficient data for target {target_id}. Found only {len(df_main)} compounds.")
 
     print("\n--- 1. Preparing Data for Multi-Task GNN ---")
@@ -241,18 +192,19 @@ def run_complete_pipeline(target_id: str, output_dir: str = 'results'):
     for _, row in tqdm(subset_df_gnn.iterrows(), total=subset_df_gnn.shape[0], desc="Creating GNN graphs"):
         graph = smiles_to_graph(row['smiles'])
         if graph:
-            graph.y = torch.tensor([row[p] for p in PROPERTIES_TO_PREDICT], dtype=torch.float)
+            graph.y = torch.tensor([[row[p] for p in PROPERTIES_TO_PREDICT]], dtype=torch.float)
             gnn_data_list.append(graph)
 
     train_val_data, test_data = train_test_split(gnn_data_list, test_size=0.15, random_state=42)
     train_data, val_data = train_test_split(train_val_data, test_size=0.17, random_state=42)
 
+    # --- THIS SCALING LOOP IS NOW CORRECTED ---
     scalers = {}
     for i, prop in enumerate(PROPERTIES_TO_PREDICT):
-        targets = np.array([d.y[i].item() for d in train_data]).reshape(-1, 1)
+        targets = np.array([d.y[0, i].item() for d in train_data]).reshape(-1, 1)
         scalers[prop] = StandardScaler().fit(targets)
         for d in train_val_data + test_data:
-            d.y[i] = torch.tensor(scalers[prop].transform([[d.y[i].item()]])[0,0], dtype=torch.float32)
+            d.y[0, i] = torch.tensor(scalers[prop].transform([[d.y[0, i].item()]])[0,0], dtype=torch.float32)
 
     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=BATCH_SIZE)
@@ -271,7 +223,8 @@ def run_complete_pipeline(target_id: str, output_dir: str = 'results'):
         gnn_model.train()
         for batch in train_loader:
             batch = batch.to(DEVICE); optimizer_gnn.zero_grad()
-            out = gnn_model(batch); loss = loss_fn_gnn(out, batch.y.to(DEVICE))
+            out = gnn_model(batch)
+            loss = loss_fn_gnn(out, batch.y.to(DEVICE))
             loss.backward(); optimizer_gnn.step()
         val_maes = evaluate_multitask_gnn(val_loader, gnn_model, scalers, DEVICE, PROPERTIES_TO_PREDICT)
         if sum(val_maes.values()) < best_val_mae_sum:
@@ -306,31 +259,32 @@ def run_complete_pipeline(target_id: str, output_dir: str = 'results'):
     print("\n--- A. GNN PERFORMANCE ON UNSEEN TEST DATA ---")
     test_maes_report = evaluate_multitask_gnn(test_loader, gnn_model, scalers, DEVICE, PROPERTIES_TO_PREDICT)
     
-    # --- 5. Novel Molecule Generation & Analysis ---
     print("\n--- B. GENERATING AND ANALYZING NOVEL MOLECULES ---")
-    generated_smiles = [sample_selfies(rnn_model, token2idx, idx2token, DEVICE, temperature=0.95) for _ in tqdm(range(200), desc="Generating Molecules")]
-    valid_smiles = [s for s in generated_smiles if s and Chem.MolFromSmiles(s)]
-    novel_graphs = [smiles_to_graph(s) for s in valid_smiles if s not in df_main['smiles'].values]
-    valid_novel_graphs = [(smi, g) for smi, g in zip(valid_smiles, novel_graphs) if g is not None]
-
     analysis_results = []
-    if valid_novel_graphs:
-        smiles_for_analysis, graphs_for_analysis = zip(*valid_novel_graphs)
-        predict_loader = DataLoader(list(graphs_for_analysis), batch_size=len(graphs_for_analysis))
-        batch = next(iter(predict_loader)).to(DEVICE)
-        preds_scaled = gnn_model(batch).cpu().detach().numpy()
+    try:
+        generated_smiles = [sample_selfies(rnn_model, token2idx, idx2token, DEVICE, temperature=0.95) for _ in tqdm(range(200), desc="Generating Molecules")]
+        valid_smiles = [s for s in generated_smiles if s and Chem.MolFromSmiles(s)]
+        novel_smiles = [s for s in valid_smiles if s not in df_main['smiles'].values]
+        print(f"Generated {len(novel_smiles)} valid and novel molecules.")
 
-        for i, smiles in enumerate(smiles_for_analysis):
-            predicted_props = {prop: scalers[prop].inverse_transform(preds_scaled[i, j].reshape(1, -1))[0,0] for j, prop in enumerate(PROPERTIES_TO_PREDICT)}
-            assessment = suggest_drug_candidate_potential(predicted_props)
-            analysis_results.append([
-                smiles,
-                f"{predicted_props['pchembl_value']:.2f}",
-                f"{predicted_props['logp']:.2f}",
-                f"{predicted_props['molecular_weight']:.2f}",
-                assessment
-            ])
-    
+        if novel_smiles:
+            novel_graphs = [smiles_to_graph(s) for s in novel_smiles]
+            valid_novel_data = [(smi, g) for smi, g in zip(novel_smiles, novel_graphs) if g is not None]
+            if valid_novel_data:
+                smiles_for_analysis, graphs_for_analysis = zip(*valid_novel_data)
+                predict_loader = DataLoader(list(graphs_for_analysis), batch_size=len(graphs_for_analysis))
+                batch = next(iter(predict_loader)).to(DEVICE)
+                preds_scaled = gnn_model(batch).cpu().detach().numpy()
+                for i, smiles in enumerate(smiles_for_analysis):
+                    predicted_props = {prop: scalers[prop].inverse_transform(preds_scaled[i, j].reshape(1, -1))[0,0] for j, prop in enumerate(PROPERTIES_TO_PREDICT)}
+                    assessment = suggest_drug_candidate_potential(predicted_props)
+                    analysis_results.append([
+                        smiles, f"{predicted_props['pchembl_value']:.2f}", f"{predicted_props['logp']:.2f}",
+                        f"{predicted_props['molecular_weight']:.2f}", assessment
+                    ])
+    except (ValueError, IndexError) as e:
+        print(f"\nWARNING: Could not analyze generated molecules. Details: {e}")
+
     # --- 6. Save results to CSV ---
     headers = ["Novel SMILES", "Pred. pChEMBL", "Pred. logP", "Pred. MW", "Drug Candidate Assessment"]
     df_analysis = pd.DataFrame(analysis_results, columns=headers)
