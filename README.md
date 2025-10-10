@@ -1,134 +1,112 @@
 
-# 🧪 NOVAMOL
+# 🧬 NovaMol: A Generative and Predictive AI Engine for Drug Discovery
 
-This project combines **Graph Neural Networks (GNNs)** and **Recurrent Neural Networks (RNNs)** to explore the chemical space of molecules. It is capable of:
+**Contributors:** wasae, raja, john, hari
 
-* 🧬 **Generating novel molecules** from SMILES strings using an LSTM-based RNN.
-* 🔗 **Building molecular graphs** (atoms as nodes, bonds as edges) with PyTorch Geometric.
-* ⚡ **Predicting molecular properties** (e.g., dipole moment) using a trained GNN.
-* 🌍 **Identifying novelty** of generated molecules by comparing fingerprints (Tanimoto similarity).
-* 📊 **Validating predictions** against known PubChem molecules and computing accuracy.
-* 💡 **Exploring industrial applications** of discovered molecules (future direction).
+<img width="1782" height="735" alt="Screenshot 2025-10-10 142459" src="https://github.com/user-attachments/assets/319f0598-c5dd-44fa-9e11-a15109239f2c" />
+
+
+NovaMol is an advanced machine learning pipeline that combines **Graph Neural Networks (GNNs)** for property prediction and **Recurrent Neural Networks (RNNs)** for molecule generation. It is designed to accelerate *de novo* drug discovery by exploring novel chemical space and providing instant analysis of generated molecules.
 
 ---
 
-## 🚀 Project Workflow
+## 🚀 Core Features
 
-1. **Dataset Preparation**
+* **Generative Chemistry:** Utilizes an LSTM-based RNN to learn the language of molecular structures and generate novel, chemically valid molecules in SMILES format.
+* **Predictive Analytics:** Employs a powerful Graph Neural Network (GNN) to predict critical molecular properties directly from the graph structure of a molecule.
+* **Targeted Discovery:** Can be trained on specific biological targets (e.g., EGFR for lung cancer) to generate and evaluate molecules with a higher probability of being effective.
+* **Comprehensive Analysis:** Automatically calculates a suite of drug-likeness properties for each generated molecule, including TPSA, QED, SA Score, and Fsp3.
+* **Novelty Verification:** Checks generated molecules against the massive PubChem database to distinguish between known compounds and truly novel discoveries.
 
-   * Uses QM9/QM40 dataset (`main.csv`) containing molecules with atomic coordinates, bonds, and properties like dipole moment.
-   * PubChem API is queried to verify if generated molecules already exist.
+---
 
-2. **Graph Representation**
+## 📊 Project Workflow & Results
 
-   * Atoms → nodes (encoded with atomic number `Z`).
-   * Bonds → edges (with bond order as edge attributes).
-   * Built using `torch_geometric.data.Data`.
+The NovaMol pipeline executes a complete, end-to-end drug discovery workflow, from training to validation, resulting in a ranked list of promising and novel drug candidates.
 
-3. **Modeling**
+<img width="1833" height="666" alt="Screenshot 2025-10-10 142529" src="https://github.com/user-attachments/assets/2fe97c44-f5c9-4d28-83e2-1bbefa8fe6fe" />
 
-   * **RNN (LSTM)** → generates novel molecules in SMILES form.
-   * **GNN** → predicts dipole moments from molecular graphs.
+*A sample run showing model training and real-time analysis.*
 
-4. **Novelty Check**
+Our validation shows that the GNN can predict key properties with high accuracy, and the RNN is capable of generating a significant number of truly novel molecules.
 
-   * Morgan fingerprints + Tanimoto similarity.
-   * If similarity < 0.7 → considered "novel molecule."
+<img width="1573" height="890" alt="Screenshot 2025-10-10 142602" src="https://github.com/user-attachments/assets/a528dfae-569c-4149-b384-5052bde19e54" />
 
-5. **Evaluation**
-
-   * Predictions validated against **PubChem** experimental values (where available).
-   * Accuracy computed per molecule and averaged.
+*The final report, showing run statistics, model performance, and a table of analyzed novel molecules.*
 
 ---
 
 ## 📂 Repository Structure
 
 ```
-📦 molecule-gnn-rnn
-├── data/
-│   ├── main.csv          # QM9/QM40 dataset
-│   ├── bonds.csv         # Bond info
-│   ├── xyz.csv           # Atomic coordinates
-├── models/
-│   ├── gnn_model.py      # Graph Neural Network for property prediction
-│   ├── rnn_model.py      # LSTM model for SMILES generation
-├── notebooks/
-│   ├── train_gnn.ipynb   # Training pipeline for GNN
-│   ├── generate_rnn.ipynb# Molecule generation via RNN
-│   ├── validate.ipynb    # PubChem validation & accuracy
-├── utils/
-│   ├── fingerprints.py   # Morgan fingerprint + similarity
-│   ├── pubchem_api.py    # PubChem data fetching
-│   ├── graph_utils.py    # Build PyG graphs from dataset
-├── README.md
-└── requirements.txt
+
+📦 novamol-drug-discovery/
+├── Home.py                  \# Main Streamlit landing page
+├── SA\_Score.py              \# Local script for Synthetic Accessibility
+├── pages/
+│   └── 1\_🧪\_Launch\_NovaMol\_App.py \# The interactive Streamlit app
+├── pipeline.py              \# Core ML pipeline for training and generation
+├── requirements.txt         \# Project dependencies
+└── results\_[TARGET\_ID]/     \# Output directory for models and CSVs
+
+````
+
+---
+
+## ⚙️ Installation & Usage
+
+This project is built as a Streamlit web application for an interactive, user-friendly experience.
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/yourusername/novamol-drug-discovery.git](https://github.com/yourusername/novamol-drug-discovery.git)
+cd novamol-drug-discovery
+````
+
+### 2\. Set Up Environment
+
+It is recommended to use a Conda environment.
+
+```bash
+# Create and activate the environment
+conda create -n novamol python=3.10
+conda activate novamol
+
+# Install RDKit (required first)
+conda install -c conda-forge rdkit
+
+# Install other dependencies
+pip install -r requirements.txt -f [https://data.pyg.org/whl/torch-$(python](https://data.pyg.org/whl/torch-$(python) -c "import torch; print(torch.__version__)").html
 ```
 
----
+### 3\. Run the Application
 
-## 📊 Results
+Launch the Streamlit web server. Your browser will automatically open to the landing page.
 
-* Predicted dipole moments of generated molecules.
-* Verified subset with PubChem → **average prediction accuracy \~75%**.
-* Identified **novel molecules** with no PubChem entries.
+```bash
+streamlit run Home.py
+```
 
----
+Navigate to the "Launch NovaMol App" page from the sidebar to start using the tool.
+
+-----
 
 ## 🔮 Future Work
 
-* Map **predicted properties → industrial applications**.
-* Extend beyond dipole moment to properties like polarizability, solubility, HOMO-LUMO gap.
-* Deploy as a **web app demo** (similar to AlphaFold DB).
+  * **Expand Predictive Capabilities:** Train the GNN to predict a wider range of ADME/Tox properties (e.g., hERG inhibition, Blood-Brain Barrier penetration).
+  * **Advanced Generative Models:** Explore more advanced generative architectures like Transformers or Flow-based models for molecule generation.
+  * **Real-time 3D Visualization:** Integrate a 3D molecule viewer (like Py3Dmol) directly into the Streamlit app to visualize the generated candidates.
 
----
+-----
 
-## ⚙️ Installation
+## 📚 Key Technologies
 
-```bash
-git clone https://github.com/yourusername/molecule-gnn-rnn.git
-cd molecule-gnn-rnn
-pip install -r requirements.txt
+  * **PyTorch & PyTorch Geometric:** For building and training the GNN and RNN models.
+  * **Streamlit:** For creating the interactive web application and user interface.
+  * **RDKit:** For all chemical informatics tasks, including fingerprinting and property calculation.
+  * **ChEMBL & PubChem:** As primary data sources for training and validation.
+
+<!-- end list -->
+
 ```
-
----
-
-## ▶️ Usage
-
-### Train GNN
-
-```bash
-python train_gnn.py
 ```
-
-### Generate Molecules with RNN
-
-```bash
-python generate_rnn.py
-```
-
-### Validate Against PubChem
-
-```bash
-python validate.py
-```
-
----
-
-## 📚 References
-
-* QM9 / QM40 Dataset
-* PubChem API
-* PyTorch Geometric
-* RDKit for chemical informatics
-
----
-
-## 👥 Contributors
-
-* **wasae** 
-* **raja** 
-* **john** 
-* **hari** 
-
-
