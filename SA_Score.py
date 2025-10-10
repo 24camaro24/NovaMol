@@ -4,7 +4,7 @@
 # Estimation of Synthetic Accessibility Score of Drug-like Molecules based on Molecular Complexity and Fragment Contributions
 # Peter Ertl and Ansgar Schuffenhauer
 # Journal of Cheminformatics 1:8 (2009)
-# http://www.jcheminf.com/content/1/1/8
+# http://www.jcheminf.com/content/1/1/
 #
 # several small modifications to the original paper are included
 # particularly slightly different formula for marocyclic penalty
