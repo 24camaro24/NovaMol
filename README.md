@@ -1,7 +1,7 @@
 
 # 🧬 NovaMol: A Generative and Predictive AI Engine for Drug Discovery
 
-**Contributors:** Ahmed Abdul Wasae, Raja, John Joseph Peter, Hari
+**Contributors:** Ahmed Abdul Wasae, Raja Vijayakumar, John Joseph Peter, Hari Krishna
 
 <img width="1782" height="735" alt="Screenshot 2025-10-10 142459" src="https://github.com/user-attachments/assets/319f0598-c5dd-44fa-9e11-a15109239f2c" />
 
