@@ -465,70 +465,22 @@ import torch.nn.functional as F
 from torch_geometric.nn import GINConv, global_add_pool
 
 class MultiTaskGNN(nn.Module):
-    """
-    An enhanced Graph Isomorphism Network (GIN) for multi-task graph regression.
-    
-    This model includes:
-    - A variable number of GNN layers.
-    - BatchNorm for stabilization.
-    - Dropout for regularization.
-    - Residual connections to help train deeper networks.
-    """
-    def __init__(self, in_dim: int, out_dim: int = 4, num_layers: int = 3, hidden_dim: int = 128, dropout_rate: float = 0.5):
-        # Corrected __init__ syntax
+    def __init__(self, in_dim, hidden_dim=128, out_dim=4):
         super().__init__()
-        
-        self.dropout_rate = dropout_rate
-
-        # This layer projects the initial node features into the hidden dimension
-        self.initial_embedding = nn.Linear(in_dim, hidden_dim)
-        
-        self.convs = nn.ModuleList()
-        self.batch_norms = nn.ModuleList()
-
-        # Create a stack of GIN layers
-        for _ in range(num_layers):
-            # The MLP inside GINConv is crucial for its expressive power
-            mlp = nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim * 2),
-                nn.BatchNorm1d(hidden_dim * 2),
-                nn.ReLU(),
-                nn.Linear(hidden_dim * 2, hidden_dim)
-            )
-            self.convs.append(GINConv(mlp, train_eps=True))
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-
-        # Post-convolution MLP for the final graph-level prediction
+        self.conv1 = GINConv(nn.Sequential(nn.Linear(in_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim)))
+        self.conv2 = GINConv(nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim)))
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(p=self.dropout_rate),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, out_dim)
+            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim), nn.ReLU()
         )
-
+        self.out = nn.Linear(hidden_dim, out_dim)
     def forward(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
-        
-        # 1. Initial node embedding
-        x = self.initial_embedding(x)
-        
-        # 2. GNN layers with residual connections
-        for conv, bn in zip(self.convs, self.batch_norms):
-            x_residual = x
-            x = conv(x, edge_index)
-            x = bn(x)
-            x = F.relu(x)
-            x = x + x_residual  # Add the residual connection
-        
-        # 3. Readout phase: Aggregate node features into a single graph embedding
-        x_graph = global_add_pool(x, batch)
-        
-        # 4. Final prediction using the MLP
-        output = self.mlp(x_graph)
-        
-        return output
+        x = F.relu(self.conv1(x, edge_index))
+        x = F.relu(self.conv2(x, edge_index))
+        x = global_add_pool(x, batch)
+        x = self.mlp(x)
+        return self.out(x)
 
 class SELFIES_RNN(nn.Module):
     def __init__(self, vocab_size, emb_size=128, hidden_size=512, num_layers=3):
