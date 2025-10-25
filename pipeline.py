@@ -20,7 +20,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from rdkit import Chem
 from rdkit.Chem import Descriptors
-from chembl_webresource_client.new_client import new_client
+# from chembl_webresource_client.new_client import new_client
 import selfies as sf
 # At the top of pipeline.py, with other rdkit imports
 from rdkit.Chem import Descriptors, rdMolDescriptors, QED
@@ -359,9 +359,10 @@ def check_pubchem_novelty(smiles_list):
 def get_chembl_data(target_id='CHEMBL203', min_pchembl=5.0):
     # This function is unchanged
     print(f"--- Downloading data for target {target_id} from ChEMBL ---")
-    activity = new_client.activity
-    res = activity.filter(target_chembl_id=target_id, standard_type="IC50", pchembl_value__gte=min_pchembl)
-    df = pd.DataFrame(res)
+    # activity = new_client.activity
+    # res = activity.filter(target_chembl_id=target_id, standard_type="IC50", pchembl_value__gte=min_pchembl)
+    # df = pd.DataFrame(res)
+    df = pd.read_csv(f'data/{target_id}_raw_chembl.csv')
 
     if df.empty:
         return df
